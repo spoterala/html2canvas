@@ -45,6 +45,7 @@ import {Renderer} from '../renderer';
 import {Context} from '../../core/context';
 import {DIRECTION} from '../../css/property-descriptors/direction';
 import {splitGraphemes} from 'text-segmentation';
+import {layout} from './textarea-layout';
 
 export type RenderConfigurations = RenderOptions & {
     backgroundColor: Color | null;
@@ -145,13 +146,24 @@ export class CanvasRenderer extends Renderer {
         }
     }
 
-    renderTextWithLetterSpacing(text: TextBounds, letterSpacing: number, baseline: number): void {
-        if (letterSpacing === 0) {
-            this.ctx.fillText(text.text, text.bounds.left, text.bounds.top + baseline);
+    renderTextWithLetterSpacing(text: TextBounds, letterSpacing: number, lineHeight?: number) {
+        if (lineHeight === undefined) {
+            this.ctx.fillText(text.text, text.bounds.left, text.bounds.top + text.bounds.height);
+        } else if (text.text.length > 20) {
+            const chars = splitGraphemes(text.text);
+            const pos = layout(chars, text.bounds.width, (s, len) =>
+                this.ctx.measureText(s).width + letterSpacing * (len - 1));
+            const dx = text.bounds.left;
+            const dy = text.bounds.top + lineHeight;
+            for (let i = 0; i < pos.length; i++) {
+                if (pos[i][0] >= 0) {
+                    this.ctx.fillText(chars[i], pos[i][0] + dx, pos[i][1] * lineHeight + dy);
+                }
+            }
         } else {
             const letters = splitGraphemes(text.text);
             letters.reduce((left, letter) => {
-                this.ctx.fillText(letter, left, text.bounds.top + baseline);
+                this.ctx.fillText(letter, left, text.bounds.top + lineHeight);
 
                 return left + this.ctx.measureText(letter).width;
             }, text.bounds.left);
@@ -389,8 +401,7 @@ export class CanvasRenderer extends Renderer {
         }
 
         if (isTextInputElement(container) && container.value.length) {
-            const [fontFamily, fontSize] = this.createFontStyle(styles);
-            const {baseline} = this.fontMetrics.getMetrics(fontFamily, fontSize);
+            const fontFamily = this.createFontStyle(styles)[0];
 
             this.ctx.font = fontFamily;
             this.ctx.fillStyle = asString(styles.color);
@@ -422,11 +433,8 @@ export class CanvasRenderer extends Renderer {
             ]);
 
             this.ctx.clip();
-            this.renderTextWithLetterSpacing(
-                new TextBounds(container.value, textBounds),
-                styles.letterSpacing,
-                baseline
-            );
+            const lineHeight = (container instanceof TextareaElementContainer) ? computeLineHeight(styles.lineHeight, styles.fontSize.number) : undefined;
+            this.renderTextWithLetterSpacing(new TextBounds(container.value, textBounds), styles.letterSpacing, lineHeight);
             this.ctx.restore();
             this.ctx.textBaseline = 'alphabetic';
             this.ctx.textAlign = 'left';
