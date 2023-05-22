@@ -44,7 +44,6 @@ import {PAINT_ORDER_LAYER} from '../../css/property-descriptors/paint-order';
 import {Renderer} from '../renderer';
 import {Context} from '../../core/context';
 import {DIRECTION} from '../../css/property-descriptors/direction';
-import {splitGraphemes} from 'text-segmentation';
 import {layout} from './textarea-layout';
 
 export type RenderConfigurations = RenderOptions & {
@@ -150,7 +149,7 @@ export class CanvasRenderer extends Renderer {
         if (lineHeight === undefined) {
             this.ctx.fillText(text.text, text.bounds.left, text.bounds.top + text.bounds.height);
         } else if (text.text.length > 20) {
-            const chars = splitGraphemes(text.text);
+            const chars = segmentGraphemes(text.text);
             const pos = layout(chars, text.bounds.width, (s, len) =>
                 this.ctx.measureText(s).width + letterSpacing * (len - 1));
             const dx = text.bounds.left;
